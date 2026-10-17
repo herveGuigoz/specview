@@ -122,7 +122,16 @@ try {
  await page.setViewportSize({width: 390, height: 844})
  await page.getByRole('button', {name: 'Ouvrir la navigation'}).click()
  await page.getByRole('button', {name: 'Activer le thème sombre'}).click()
- await page.getByRole('button', {name: 'Fermer la navigation'}).click()
+ const closeNavigation = page.getByRole('button', {name: 'Fermer la navigation'})
+ const closeBounds = await closeNavigation.boundingBox()
+ const sidebarBounds = await page.getByRole('complementary', {name: 'Navigation principale'}).boundingBox()
+ assert.ok(closeBounds && sidebarBounds && closeBounds.x >= sidebarBounds.x + sidebarBounds.width - 1, 'navigation backdrop overlaps the sidebar')
+ await closeNavigation.click()
+ await closeNavigation.waitFor({state: 'detached'})
+ await page.waitForFunction(() => {
+  const sidebar = document.querySelector('[aria-label="Navigation principale"]')
+  return sidebar && sidebar.getBoundingClientRect().right <= 0
+ })
  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'page overflows at 390px')
  await page.keyboard.press('Tab')
  assert.ok(await page.evaluate(() => document.activeElement !== document.body), 'keyboard focus missing')

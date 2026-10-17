@@ -1,5 +1,5 @@
 name: Verify specview
-on: [push, pull_request, workflow_dispatch]
+on: pull_request
 jobs:
   verify:
     strategy:
