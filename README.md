@@ -8,56 +8,41 @@ The application is read-only: your files remain the single source of truth. The 
 
 ## Installation
 
-Download the archive for your system **and `SHA256SUMS` from the same [GitHub Release](../../releases)**. In the filenames below, replace `X.Y.Z` with the chosen version (for example, `1.2.3` for tag `v1.2.3`).
-
-| System | Architecture | Release asset |
-| --- | --- | --- |
-| macOS | Apple Silicon | `specview_X.Y.Z_darwin_arm64.tar.gz` |
-| macOS | Intel | `specview_X.Y.Z_darwin_amd64.tar.gz` |
-| Linux | x86-64 | `specview_X.Y.Z_linux_amd64.tar.gz` |
-| Linux | ARM64 | `specview_X.Y.Z_linux_arm64.tar.gz` |
-
-Use the executable archives attached under **Assets**. GitHub's automatic **Source code** archives contain sources, not an installed application. Temporary downloads under **Actions → Artifacts** are CI diagnostics and are not the release distribution channel.
-
-You only need a browser and an OpenSpec project to run the executable. Go, Node.js and the OpenSpec CLI are unnecessary at runtime. **`go install` is not supported for the MVP**: the frontend must be built before compiling Go. See contributing below to build from source.
-
-### macOS and Linux
-
-Open a terminal in the directory containing your archive and `SHA256SUMS`. For example, on an Apple Silicon Mac with version `1.2.3`:
+On macOS, install with [Homebrew](https://brew.sh):
 
 ```sh
-archive=specview_1.2.3_darwin_arm64.tar.gz
-expected=$(awk -v name="$archive" '$2 == name {print $1}' SHA256SUMS)
-actual=$(shasum -a 256 "$archive" | awk '{print $1}')
-if [ -z "$expected" ] || [ "$actual" != "$expected" ]; then
-  echo 'Checksum verification failed; do not extract or install.' >&2
-else
-  mkdir -p specview-extracted "$HOME/.local/bin"
-  tar -xzf "$archive" -C specview-extracted &&
-  install -m 755 specview-extracted/specview "$HOME/.local/bin/specview" &&
-  export PATH="$HOME/.local/bin:$PATH" &&
-  specview --version
-fi
+brew install --cask herveGuigoz/tap/specview
+specview --version
 ```
 
-For Intel macOS or Linux, use the matching archive name. On Linux replace `shasum -a 256` with `sha256sum`. Only the selected archive is needed; compare its own line in the manifest. A missing or mismatched checksum means stop, remove the download and download again from the intended Release. SHA-256 verifies integrity; it is not a signed proof of authenticity.
-
-Add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` or `~/.bashrc` if needed for future sessions. The executable is not signed or notarized for macOS; system security restrictions may require your review of the download before running it.
+Go, Node.js and the OpenSpec CLI are not required to run specview. You only need a browser and an OpenSpec project.
 
 ### Updating
 
-Stop `specview` with `Ctrl+C`, download the new archive and its Release's `SHA256SUMS`, then repeat verification, extraction and installation to replace the installed executable. Check the new `--version`. Your OpenSpec projects do not require a migration.
+Stop specview with `Ctrl+C`, then run:
+
+```sh
+brew update
+brew upgrade --cask herveGuigoz/tap/specview
+specview --version
+```
 
 ### Uninstalling
 
-Stop the process, then remove `$HOME/.local/bin/specview` on macOS/Linux. Remove the installation directory from your PATH if you added it solely for specview, and delete any downloaded archives and extraction directories you no longer need. Keep your OpenSpec project directories; uninstalling does not require deleting them.
+Stop specview, then run:
+
+```sh
+brew uninstall --cask herveGuigoz/tap/specview
+```
+
+Your OpenSpec projects are preserved.
 
 ## Usage
 
-From an OpenSpec project root or one of its subdirectories:
+From an OpenSpec project root:
 
 ```sh
-specview
+specview .
 ```
 
 You can also specify the project to open:

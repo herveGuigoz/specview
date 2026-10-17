@@ -64,6 +64,7 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
       - name: Verify downloaded assets and isolated binary, then publish
         run: node scripts/release.mjs publish "$RELEASE_TAG"
         env:

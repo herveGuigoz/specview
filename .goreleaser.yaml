@@ -28,6 +28,17 @@ checksum:
   name_template: SHA256SUMS
   algorithm: sha256
 
+homebrew_casks:
+  - name: specview
+    binaries:
+      - specview
+    homepage: "https://github.com/herveGuigoz/specview"
+    description: "Interface web locale pour consulter les artefacts OpenSpec"
+    repository:
+      owner: herveGuigoz
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
 release:
   draft: true
   name_template: 'specview v{{ .Version }}'
