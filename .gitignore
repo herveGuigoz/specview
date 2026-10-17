@@ -1,0 +1,7 @@
+/bin/
+/openspec/
+/ui/node_modules/
+/internal/web/dist/
+/test-results/
+*.log
+.DS_Store
