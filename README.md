@@ -17,6 +17,12 @@ specview --version
 
 Go, Node.js and the OpenSpec CLI are not required to run specview. You only need a browser and an OpenSpec project.
 
+### macOS security prompt
+
+The executable is not signed with an Apple Developer ID or notarized by Apple. macOS may display a warning that Apple could not verify whether specview contains malware.
+
+If you trust the download, open **System Settings → Privacy & Security**, click **Open Anyway** for specview, and confirm. Then run `specview .` again. See [Apple’s instructions](https://support.apple.com/guide/mac-help/mh40616/mac).
+
 ### Updating
 
 Stop specview with `Ctrl+C`, then run:
@@ -147,4 +153,4 @@ make release
 
 This creates local snapshot archives and `SHA256SUMS` in `dist/` without publishing them.
 
-Further reading: [architecture and API](docs/architecture.md), [verification results and limitations](docs/verification.md), and [OpenSpec documentation](https://openspec.dev/docs).
+Further reading: [OpenSpec documentation](https://openspec.dev/docs).
