@@ -20,3 +20,21 @@ func TestArguments(t *testing.T) {
 		}
 	}
 }
+
+func TestVersionWithoutProject(t *testing.T) {
+	t.Chdir(t.TempDir())
+	for _, value := range []string{"dev", "1.2.3"} {
+		t.Run(value, func(t *testing.T) {
+			previous := version
+			version = value
+			t.Cleanup(func() { version = previous })
+			var out bytes.Buffer
+			if err := run(context.Background(), []string{"--version"}, &out); err != nil {
+				t.Fatal(err)
+			}
+			if got, want := out.String(), "specview "+value+"\n"; got != want {
+				t.Fatalf("got %q, want %q", got, want)
+			}
+		})
+	}
+}

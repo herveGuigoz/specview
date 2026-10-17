@@ -8,54 +8,49 @@ The application is read-only: your files remain the single source of truth. The 
 
 ## Installation
 
-Download the binary for your system from **[GitHub Releases](../../releases)**.
+Download the archive for your system **and `SHA256SUMS` from the same [GitHub Release](../../releases)**. In the filenames below, replace `X.Y.Z` with the chosen version (for example, `1.2.3` for tag `v1.2.3`).
 
-| System | Architecture | Binary |
+| System | Architecture | Release asset |
 | --- | --- | --- |
-| macOS | Apple Silicon | `specview-darwin-arm64` |
-| macOS | Intel | `specview-darwin-amd64` |
-| Linux | x86-64 | `specview-linux-amd64` |
-| Linux | ARM64 | `specview-linux-arm64` |
-| Windows | x86-64 | `specview-windows-amd64.exe` |
-| Windows | ARM64 | `specview-windows-arm64.exe` |
+| macOS | Apple Silicon | `specview_X.Y.Z_darwin_arm64.tar.gz` |
+| macOS | Intel | `specview_X.Y.Z_darwin_amd64.tar.gz` |
+| Linux | x86-64 | `specview_X.Y.Z_linux_amd64.tar.gz` |
+| Linux | ARM64 | `specview_X.Y.Z_linux_arm64.tar.gz` |
 
-You only need a browser and a project containing an `openspec/` directory. Go, Node.js, and the OpenSpec CLI are not required to run `specview`.
+Use the executable archives attached under **Assets**. GitHub's automatic **Source code** archives contain sources, not an installed application. Temporary downloads under **Actions → Artifacts** are CI diagnostics and are not the release distribution channel.
+
+You only need a browser and an OpenSpec project to run the executable. Go, Node.js and the OpenSpec CLI are unnecessary at runtime. **`go install` is not supported for the MVP**: the frontend must be built before compiling Go. See contributing below to build from source.
 
 ### macOS and Linux
 
-After downloading, install the binary as `specview`. For example, on an Apple Silicon Mac:
+Open a terminal in the directory containing your archive and `SHA256SUMS`. For example, on an Apple Silicon Mac with version `1.2.3`:
 
 ```sh
-mkdir -p "$HOME/.local/bin"
-install -m 755 "$HOME/Downloads/specview-darwin-arm64" "$HOME/.local/bin/specview"
-export PATH="$HOME/.local/bin:$PATH"
-specview --version
+archive=specview_1.2.3_darwin_arm64.tar.gz
+expected=$(awk -v name="$archive" '$2 == name {print $1}' SHA256SUMS)
+actual=$(shasum -a 256 "$archive" | awk '{print $1}')
+if [ -z "$expected" ] || [ "$actual" != "$expected" ]; then
+  echo 'Checksum verification failed; do not extract or install.' >&2
+else
+  mkdir -p specview-extracted "$HOME/.local/bin"
+  tar -xzf "$archive" -C specview-extracted &&
+  install -m 755 specview-extracted/specview "$HOME/.local/bin/specview" &&
+  export PATH="$HOME/.local/bin:$PATH" &&
+  specview --version
+fi
 ```
 
-On Linux or an Intel Mac, replace the filename with the appropriate one from the table. Adjust the download path if needed.
+For Intel macOS or Linux, use the matching archive name. On Linux replace `shasum -a 256` with `sha256sum`. Only the selected archive is needed; compare its own line in the manifest. A missing or mismatched checksum means stop, remove the download and download again from the intended Release. SHA-256 verifies integrity; it is not a signed proof of authenticity.
 
-To make the command available in future terminal sessions, add this line to your shell configuration (`~/.zshrc` for zsh or `~/.bashrc` for bash), if necessary:
-
-```sh
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### Windows
-
-In PowerShell, install the binary as `specview.exe`:
-
-```powershell
-$installDir = Join-Path $env:LOCALAPPDATA 'Programs\specview'
-New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-Copy-Item "$HOME\Downloads\specview-windows-amd64.exe" (Join-Path $installDir 'specview.exe')
-& "$installDir\specview.exe" --version
-```
-
-On an ARM64 machine, use `specview-windows-arm64.exe`. Add the installation directory to your user `Path` in Windows environment variables, then open a new terminal to use the `specview` command.
+Add `export PATH="$HOME/.local/bin:$PATH"` to `~/.zshrc` or `~/.bashrc` if needed for future sessions. The executable is not signed or notarized for macOS; system security restrictions may require your review of the download before running it.
 
 ### Updating
 
-Stop `specview` with `Ctrl+C`, download the new binary from Releases, and replace the installed file by repeating the steps above. Your OpenSpec projects do not require a migration.
+Stop `specview` with `Ctrl+C`, download the new archive and its Release's `SHA256SUMS`, then repeat verification, extraction and installation to replace the installed executable. Check the new `--version`. Your OpenSpec projects do not require a migration.
+
+### Uninstalling
+
+Stop the process, then remove `$HOME/.local/bin/specview` on macOS/Linux. Remove the installation directory from your PATH if you added it solely for specview, and delete any downloaded archives and extraction directories you no longer need. Keep your OpenSpec project directories; uninstalling does not require deleting them.
 
 ## Usage
 
@@ -69,12 +64,6 @@ You can also specify the project to open:
 
 ```sh
 specview '/path/to/my project'
-```
-
-On Windows:
-
-```powershell
-specview 'C:\projects\my project'
 ```
 
 The server listens on `127.0.0.1`, selects an available port, prints its URL, and opens the browser. The process stays active in your terminal; use `Ctrl+C` to stop it.
@@ -121,17 +110,6 @@ make build
 
 `make build` installs locked dependencies with `npm ci`, checks TypeScript, compiles the frontend, and builds `bin/specview` with `CGO_ENABLED=0`.
 
-Without `make`, for example in PowerShell, use the equivalent commands:
-
-```powershell
-npm --prefix ui ci --no-audit --no-fund
-npm --prefix ui run typecheck
-npm --prefix ui run build
-$env:CGO_ENABLED = '0'
-go build -trimpath -o bin/specview.exe ./cmd/specview
-.\bin\specview.exe --no-open .
-```
-
 ### Making changes
 
 | Directory | Purpose |
@@ -159,7 +137,7 @@ After changing the frontend, run `npm --prefix ui run build` before restarting G
 make test
 ```
 
-This runs Go tests with race detection, TypeScript checks, and frontend unit tests. In PowerShell, remove the build environment variable with `Remove-Item Env:CGO_ENABLED` before running race detection tests. Without `make`, run `go test -race ./...`, `npm --prefix ui run typecheck`, and `npm --prefix ui run test:unit`.
+This runs Go tests with race detection, TypeScript checks, and frontend unit tests. Without `make`, run `go test -race ./...`, `npm --prefix ui run typecheck`, and `npm --prefix ui run test:unit`.
 
 To test the actual binary in a browser, install Chromium and run the integration tests:
 
@@ -170,29 +148,18 @@ cd ..
 make integration
 ```
 
-Integration tests require permission to open a local port and launch Chromium. Results and screenshots are written to `test-results/`. CI is configured to check the project on macOS, Linux, and Windows.
+Integration tests require permission to open a local port and launch Chromium. Results and screenshots are written to `test-results/`. CI is configured to check the project on macOS and Linux.
 
 Before submitting a pull request, describe the problem you solved and the checks you ran. Preserve read-only access to projects and avoid introducing remote runtime dependencies.
 
-### Building distribution binaries
+### Building distribution archives
+
+With GoReleaser OSS 2.18.0 installed, run:
 
 ```sh
 make release
 ```
 
-The six binaries listed in the installation table are generated in `bin/`. Users only need the executable for their platform.
-
-### Publishing a release
-
-The **Release specview** GitHub Actions workflow runs when a version tag such as `0.0.1` or `v0.0.1` is pushed. Commit and push the workflow and the changes you want to release before creating the tag:
-
-```sh
-git tag -a 0.0.1 -m "Release 0.0.1"
-git push origin 0.0.1
-```
-
-The workflow checks out the tagged commit, builds the frontend, runs unit tests, compiles all six binaries, and runs browser integration tests on Linux. The binary version is set from the tag (`v0.0.1` reports `specview 0.0.1`). Once the checks pass, it creates a GitHub Release containing the six executables and a `SHA256SUMS` file.
-
-For an existing tag, push this workflow to the default branch, then select **Actions → Release specview → Run workflow** and enter the tag. This builds the code at that tag, not the latest branch contents. The tag must contain the build sources and `scripts/release.go`. Releases are only published if the workflow succeeds; an existing Release is not overwritten.
+This creates local snapshot archives and `SHA256SUMS` in `dist/` without publishing them.
 
 Further reading: [architecture and API](docs/architecture.md), [verification results and limitations](docs/verification.md), and [OpenSpec documentation](https://openspec.dev/docs).

@@ -9,7 +9,7 @@ import (
 	"os/signal"
 )
 
-var version = "0.0.1"
+var version = "dev"
 
 func run(ctx context.Context, args []string, out io.Writer) error {
 	flags := flag.NewFlagSet("specview", flag.ContinueOnError)
