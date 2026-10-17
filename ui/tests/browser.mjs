@@ -5,7 +5,7 @@ import {mkdtemp, mkdir, writeFile, readFile, readdir, rename, rm, copyFile} from
 import {tmpdir} from 'node:os'
 import path from 'node:path'
 import {fileURLToPath} from 'node:url'
-import {spawn} from 'node:child_process'
+import {spawn, execFileSync} from 'node:child_process'
 import {createHash} from 'node:crypto'
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -14,7 +14,10 @@ const fixture = path.join(temp, 'my project')
 const binary = path.join(temp, process.platform === 'win32' ? 'specview.exe' : 'specview')
 const results = path.join(repo, 'test-results')
 await mkdir(results, {recursive: true})
-await copyFile(path.join(repo, 'bin', path.basename(binary)), binary)
+await copyFile(process.env.SPECVIEW_BINARY || path.join(repo, 'bin', path.basename(binary)), binary)
+const binaryVersion = execFileSync(binary, ['--version'], {cwd: temp, env: {...process.env, PATH: ''}, encoding: 'utf8', timeout: 10000}).trim()
+assert.match(binaryVersion, /^specview \S+$/)
+if (process.env.SPECVIEW_EXPECT_VERSION) assert.equal(binaryVersion, 'specview ' + process.env.SPECVIEW_EXPECT_VERSION)
 async function write(name, body) {const file = path.join(fixture, 'openspec', name); await mkdir(path.dirname(file), {recursive: true}); await writeFile(file, body)}
 const initialTasks = '- [ ] First task\n- [x] Second task\n\n```md\n- [ ] Example only\n```\n'
 const proposal = `# An example change
@@ -91,10 +94,16 @@ try {
  await context.grantPermissions(['clipboard-read', 'clipboard-write'])
  const page = await context.newPage()
  const pageErrors = []
+ const assetResponses = []
+ page.on('response', response => {if (/\.(js|css)$/.test(new URL(response.url()).pathname)) assetResponses.push({url: response.url(), status: response.status()})})
  page.on('pageerror', error => pageErrors.push(error.message))
  const navigate = (view, entry = '', doc = '', anchor = '') => page.goto(base + '/#' + new URLSearchParams({view, entry, doc, anchor}))
  await navigate('changes')
  await page.getByRole('link', {name: /example.*Proposition/}).first().waitFor()
+ assert.ok(assetResponses.some(asset => asset.url.endsWith('.js') && asset.status === 200), 'embedded JavaScript missing')
+ assert.ok(assetResponses.some(asset => asset.url.endsWith('.css') && asset.status === 200), 'embedded CSS missing')
+ assert.ok(await page.locator('svg.lucide').count() > 0, 'embedded icons missing')
+ assert.notEqual(await page.locator('body').evaluate(element => getComputedStyle(element).backgroundColor), 'rgba(0, 0, 0, 0)', 'styles not applied')
  await page.screenshot({path: path.join(results, 'changes-dark.png'), fullPage: true})
  await page.getByRole('textbox', {name: 'Rechercher'}).fill('does-not-exist')
  await page.getByRole('heading', {name: 'Aucun résultat'}).waitFor()
@@ -172,7 +181,7 @@ try {
  assert.equal(await fingerprint(fixture), afterMutations, 'reconnection wrote to fixture')
  assert.deepEqual(external, [], 'automatic external requests')
  assert.deepEqual(pageErrors, [], 'browser runtime errors')
- const report = {platform: process.platform, documents: 1005, measurements, externalRequests: external, pageErrors}
+ const report = {platform: process.platform, binaryVersion, documents: 1005, measurements, assetResponses, externalRequests: external, pageErrors}
  await writeFile(path.join(results, 'integration.json'), JSON.stringify(report, null, 2) + '\n')
  console.log(JSON.stringify(report, null, 2))
 } finally {

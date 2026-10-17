@@ -1,4 +1,5 @@
 /bin/
+/dist/
 /openspec/
 /ui/node_modules/
 /internal/web/dist/

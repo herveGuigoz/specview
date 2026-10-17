@@ -3,12 +3,11 @@ name: Release specview
 on:
   push:
     tags:
-      - '[0-9]*.[0-9]*.[0-9]*'
       - 'v[0-9]*.[0-9]*.[0-9]*'
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing version tag to publish (for example, 0.0.1)
+        description: Existing stable tag to publish (for example, v1.2.3)
         required: true
         type: string
 
@@ -20,94 +19,53 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  release:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
     env:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.tag || github.ref_name }}
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Validate version tag
-        id: version
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ ! "$RELEASE_TAG" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Expected a version tag such as 0.0.1 or v0.0.1" >&2
-            exit 1
-          fi
-          git show-ref --verify --quiet "refs/tags/$RELEASE_TAG"
-          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
-          printf 'version=%s\n' "${RELEASE_TAG#v}" >> "$GITHUB_OUTPUT"
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: ui/package-lock.json
-      - name: Build frontend
+      - name: Validate stable tag and commit
+        run: node scripts/release.mjs validate-tag "$RELEASE_TAG"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build frontend for unit tests
         run: make frontend
       - name: Run unit tests
         run: |
           go test -race -count=1 ./...
           npm --prefix ui run test:unit
+          node --test scripts/release.test.mjs
         env:
           SPECVIEW_REQUIRE_NETWORK_TESTS: '1'
-      - name: Build all release binaries
-        run: go run ./scripts/release.go
-        env:
-          GOFLAGS: -ldflags=-X=main.version=${{ steps.version.outputs.version }}
-      - name: Check binary version
-        env:
-          RELEASE_VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          cp bin/specview-linux-amd64 bin/specview
-          actual=$(bin/specview --version)
-          test "$actual" = "specview $RELEASE_VERSION"
-      - name: Install browser
-        working-directory: ui
-        run: npx playwright install --with-deps chromium
-      - name: Test the release binary in the browser
-        run: npm --prefix ui test
-      - name: Generate checksums
-        working-directory: bin
-        run: sha256sum specview-darwin-* specview-linux-* specview-windows-*.exe > SHA256SUMS
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-binaries
-          if-no-files-found: error
-          path: |
-            bin/specview-darwin-*
-            bin/specview-linux-*
-            bin/specview-windows-*.exe
-            bin/SHA256SUMS
-
-  publish:
-    needs: build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-binaries
-          path: dist
-      - name: Publish GitHub Release
+      - name: Refuse public release or replace failed draft
+        run: node scripts/release.mjs prepare "$RELEASE_TAG"
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          gh release create "$RELEASE_TAG" dist/* \
-            --verify-tag \
-            --title "specview $RELEASE_TAG" \
-            --generate-notes
+      - name: Build archives and upload draft assets
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          distribution: goreleaser
+          version: v2.18.0
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+      - name: Verify downloaded assets and isolated binary, then publish
+        run: node scripts/release.mjs publish "$RELEASE_TAG"
+        env:
+          GH_TOKEN: ${{ github.token }}

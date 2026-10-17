@@ -1,0 +1,44 @@
+version: 2
+project_name: specview
+
+before:
+  hooks:
+    - make frontend
+
+builds:
+  - id: specview
+    main: ./cmd/specview
+    binary: specview
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: specview
+    formats: [tar.gz]
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}'
+    files:
+      - README.md
+
+checksum:
+  name_template: SHA256SUMS
+  algorithm: sha256
+
+homebrew_casks:
+  - name: specview
+    binaries:
+      - specview
+    homepage: "https://github.com/herveGuigoz/specview"
+    description: "Interface web locale pour consulter les artefacts OpenSpec"
+    repository:
+      owner: herveGuigoz
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+release:
+  draft: true
+  name_template: 'specview v{{ .Version }}'
